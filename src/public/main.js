@@ -82,6 +82,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
     clickCount: 0,
     clickCounterEnabled: false,
     gameStatus: GAME_STATES.IDLE,
+    onGameStateChange: () => {},
     get currentPlayer() {
       return {
         id: getId(),
@@ -99,9 +100,9 @@ import { $, debounce, handleDomElement } from '/utils.js'
     get usersPlaying() {
       return this.activePlayers.filter((player) => player.status === 'playing')
     },
-    setGameStatus(newState, onGameStateChange) {
+    setGameStatus(newState) {
       this.gameStatus = newState
-      onGameStateChange(newState)
+      this.onGameStateChange(newState)
     },
     disconnectPlayer(player) {
       const index = this.activePlayers.findIndex((p) => p.id === player.id)
@@ -265,6 +266,8 @@ import { $, debounce, handleDomElement } from '/utils.js'
     gameStateChangeEvents[GAME_STATES.IDLE]()
   }
 
+  gameStore.onGameStateChange = onGameStateChange
+
   const [name, setName, getCurrentName] = handleDomElement($nameInput)
 
   if (getUsername()) {
@@ -281,7 +284,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
 
     window.localStorage.setItem('name', name.value.trim())
 
-    gameStore.setGameStatus(GAME_STATES.WAITING, onGameStateChange)
+    gameStore.setGameStatus(GAME_STATES.WAITING)
   }
 
   $userForm.addEventListener('submit', handleFormSubmit)
@@ -295,5 +298,16 @@ import { $, debounce, handleDomElement } from '/utils.js'
 
   $nameInput.addEventListener('input', () => {
     debouncedHandleInputNameChange()
+  })
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.code === 'Escape') {
+      if (
+        gameStore.gameStatus === GAME_STATES.FINISHED ||
+        gameStore.gameStatus === GAME_STATES.WAITING
+      ) {
+        gameStore.setGameStatus(GAME_STATES.IDLE)
+      }
+    }
   })
 })()
