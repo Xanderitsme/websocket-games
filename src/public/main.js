@@ -92,10 +92,17 @@ import { $, debounce, handleDomElement } from '/utils.js'
       }
     },
     get lobbyUsers() {
-      return this.activePlayers.filter((player) => player.status === 'idle')
+      return this.activePlayers.filter(
+        (player) => player.status === GAME_STATES.IDLE
+      )
     },
     get usersWaiting() {
-      return this.activePlayers.filter((player) => player.status === 'waiting')
+      console.log(this.activePlayers)
+
+      return this.activePlayers.filter((player) => {
+        console.log(player.status)
+        return player.status === GAME_STATES.WAITING
+      })
     },
     get usersPlaying() {
       return this.activePlayers.filter((player) => player.status === 'playing')
@@ -120,6 +127,8 @@ import { $, debounce, handleDomElement } from '/utils.js'
         } else {
           this.activePlayers[index] = player
         }
+        console.log(this.activePlayers[index])
+
         return
       }
 
@@ -242,9 +251,19 @@ import { $, debounce, handleDomElement } from '/utils.js'
   const gameStateChangeEvents = {
     [GAME_STATES.IDLE]: () => {
       console.log('game state: ', GAME_STATES.IDLE)
+
+      view.showFormContainer()
+
+      setGameHeader('')
+      setFooterMessage('')
     },
     [GAME_STATES.WAITING]: () => {
       console.log('game state: ', GAME_STATES.WAITING)
+
+      view.showGameContainer()
+
+      setGameHeader('ESPERANDO')
+      setFooterMessage(`${gameStore.usersWaiting.length} usuarios esperando`)
     },
     [GAME_STATES.STARTING]: () => {
       console.log('game state: ', GAME_STATES.STARTING)
@@ -260,6 +279,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
   const onGameStateChange = (newState) => {
     if (Object.keys(gameStateChangeEvents).includes(newState)) {
       gameStateChangeEvents[newState]()
+      socket.emit(SERVER_EVENTS.UPDATE_USER, gameStore.currentPlayer, 'status')
       return
     }
 

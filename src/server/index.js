@@ -98,12 +98,6 @@ io.on('connection', (socket) => {
     }
   })
 
-  socket.on(GAME_STATES.IDLE, (user) => {
-    verifyNewConnectedUser(user)
-
-    updateLobbyData()
-  })
-
   function handleUserStatusChange(user) {
     if (user.status === 'waiting') {
       verifyNewWaitingUser(user)
@@ -144,22 +138,20 @@ io.on('connection', (socket) => {
       }
     }
 
+    console.log(user)
+
     io.emit(SERVER_EVENTS.UPDATE_USER, user, 'status')
   }
 
-  function updateLobbyData() {
-    io.emit(GAME_STATES.LOBBY, connectedUsers)
-  }
+  // function verifyNewConnectedUser(user) {
+  //   const index = connectedUsers.findIndex((u) => u.id === user.id)
 
-  function verifyNewConnectedUser(user) {
-    const index = connectedUsers.findIndex((u) => u.id === user.id)
-
-    if (index !== -1) {
-      connectedUsers[index].username = user.username
-    } else {
-      connectedUsers.push(user)
-    }
-  }
+  //   if (index !== -1) {
+  //     connectedUsers[index].username = user.username
+  //   } else {
+  //     connectedUsers.push(user)
+  //   }
+  // }
 
   function verifyNewWaitingUser(user) {
     const index = connectedUsers.findIndex((u) => u.id === user.id)
