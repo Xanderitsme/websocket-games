@@ -2,6 +2,11 @@
   <head>
     <meta charset="UTF-8" />
     <title>Websocket game</title>
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="https://animations-practice.pages.dev/favicon.svg"
+    />
     <meta
       name="description"
       content="This web has many interesting things development using basic web concepts and eventualy it is going to scale using more advances concepts"
@@ -17,8 +22,8 @@
       content="Simple game developed using websocket technology"
     />
 
-    <link rel="icon" type="image/x-icon" href="/favicon.svg" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" src="/main.js"></script>
+    <script src="/tailwind.3.4.5.js"></script>
   </head>
 
   <body
@@ -59,9 +64,44 @@
       <div class="border-b border-zinc-200 dark:border-zinc-800"></div>
 
       <main class="py-6 px-2 flex flex-grow justify-center">
-        <div
+        <section
           class="bg-zinc-100 dark:bg-zinc-900 rounded-lg px-6 py-8 ring-1 ring-slate-900/5 shadow-xl h-fit"
-        ></div>
+          data-id="form-container"
+        >
+          <form data-id="form-user-data" class="flex gap-2 items-end">
+            <label class="flex flex-col gap-0.5 cursor-pointer">
+              <span
+                class="text-zinc-600 dark:text-zinc-400 text-sm font-semibold"
+              >
+                Player name
+              </span>
+              <input
+                class="outline-none rounded-md px-3 py-2 border bg-zinc-200 text-zinc-500 border-zinc-300 focus:text-zinc-700 hover:border-emerald-400 focus:border-zinc-400 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 dark:focus:text-emerald-100 dark:hover:border-emerald-800 dark:focus:border-zinc-400"
+                name="name"
+                type="text"
+                autocomplete="off"
+                autofocus
+              />
+            </label>
+            <button
+              type="submit"
+              class="bg-emerald-700 rounded px-3 py-2.5 font-semibold h-fit hover:bg-emerald-600 transition text-white"
+            >
+              Play!
+            </button>
+          </form>
+          <div data-id="lobby-message" class="text-zinc-500"></div>
+        </section>
+
+        <section
+          class="bg-zinc-100 dark:bg-zinc-900 rounded-lg px-6 py-8 ring-1 ring-slate-900/5 shadow-xl h-fit w-full max-w-lg hidden"
+          data-id="game-container"
+        >
+          <header>
+            <h2 data-id="game-state-message" class="text-center"></h2>
+          </header>
+          <div data-id="game-message" class="text-zinc-500"></div>
+        </section>
       </main>
 
       <footer class="flex flex-col gap-2 px-5 py-6 mt-auto">
