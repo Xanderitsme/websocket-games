@@ -31,11 +31,11 @@ import { $, debounce, handleDomElement } from '/utils.js'
 
   // Declare global constants
 
-  const GAME_STATES = {
-    IDLE: 'idle',
+  const PLAYER_STATES = {
+    LOBBY: 'lobby',
     WAITING: 'waiting',
     STARTING: 'starting',
-    IN_PROGRESS: 'in_progress',
+    PLAYING: 'playing',
     FINISHED: 'finished'
   }
 
@@ -43,7 +43,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
     STARTING_GAME: 'starting_game',
     GAME_IN_PROGRESS: 'game_in_progress',
     GAME_FINISHED: 'game_finished',
-    IDLE: 'idle'
+    IDLE: PLAYER_STATES.LOBBY
   }
 
   const SERVER_EVENTS = {
@@ -81,7 +81,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
     activePlayers: [],
     clickCount: 0,
     clickCounterEnabled: false,
-    gameStatus: GAME_STATES.IDLE,
+    gameStatus: PLAYER_STATES.LOBBY,
     onGameStateChange: () => {},
     get currentPlayer() {
       return {
@@ -93,15 +93,12 @@ import { $, debounce, handleDomElement } from '/utils.js'
     },
     get lobbyUsers() {
       return this.activePlayers.filter(
-        (player) => player.status === GAME_STATES.IDLE
+        (player) => player.status === PLAYER_STATES.LOBBY
       )
     },
     get usersWaiting() {
-      console.log(this.activePlayers)
-
       return this.activePlayers.filter((player) => {
-        console.log(player.status)
-        return player.status === GAME_STATES.WAITING
+        return player.status === PLAYER_STATES.WAITING
       })
     },
     get usersPlaying() {
@@ -109,6 +106,15 @@ import { $, debounce, handleDomElement } from '/utils.js'
     },
     setGameStatus(newState) {
       this.gameStatus = newState
+
+      const index = this.activePlayers.findIndex(
+        (p) => p.id === this.currentPlayer.id
+      )
+
+      if (index !== -1) {
+        this.activePlayers[index].status = newState
+      }
+
       this.onGameStateChange(newState)
     },
     disconnectPlayer(player) {
@@ -127,8 +133,6 @@ import { $, debounce, handleDomElement } from '/utils.js'
         } else {
           this.activePlayers[index] = player
         }
-        console.log(this.activePlayers[index])
-
         return
       }
 
@@ -151,7 +155,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
 
   const view = {
     showOnlineUsers() {
-      if (gameStore.gameStatus === 'idle') {
+      if (gameStore.gameStatus === PLAYER_STATES.LOBBY) {
         const header = `<div>Usuarios conectados: ${gameStore.activePlayers.length}</div>`
 
         const body = gameStore.activePlayers
@@ -168,6 +172,9 @@ import { $, debounce, handleDomElement } from '/utils.js'
     showDisconnectedUser(user) {
       setFooterMessage(`El jugador ${user.username} se ha desconectado!`)
       setFooterMessageDebounced('')
+    },
+    showUsersWaiting() {
+      setMessage(`${gameStore.usersWaiting.length} usuarios esperando...`)
     },
     showFormContainer() {
       $formContainer.classList.remove('hidden')
@@ -186,23 +193,22 @@ import { $, debounce, handleDomElement } from '/utils.js'
       gameStore.updateActivePlayers(user)
       view.showNewConnectedUser(user)
       view.showOnlineUsers()
-
-      // console.log('player joined', user)
     },
     [SERVER_EVENTS.PLAYER_DISCONNECTED]: (user) => {
       gameStore.disconnectPlayer(user)
       view.showDisconnectedUser(user)
       view.showOnlineUsers()
-
-      console.log(gameStore.activePlayers)
-
-      console.log('player disconnect', user)
     },
     [SERVER_EVENTS.UPDATE_USER]: (user, field) => {
       gameStore.updateActivePlayers(user, field)
       view.showOnlineUsers()
 
-      // console.log('update user', user)
+      if (
+        gameStore.currentPlayer.status === PLAYER_STATES.WAITING &&
+        field === 'status'
+      ) {
+        view.showUsersWaiting()
+      }
     },
     [SERVER_EVENTS.UPDATE_ALL]: (users) => {
       users.forEach((user) => {
@@ -210,11 +216,11 @@ import { $, debounce, handleDomElement } from '/utils.js'
       })
 
       view.showOnlineUsers()
-
-      // console.log('update all users', users.length)
     },
-    [SERVER_EVENTS.WAITING_PLAYERS]: (user) => {
-      console.log('waiting players')
+    [SERVER_EVENTS.WAITING_PLAYERS]: (usersWaiting) => {
+      console.log('waiting players', usersWaiting)
+
+      view.showUsersWaiting()
     },
     [SERVER_EVENTS.STARTING_GAME]: (user) => {
       console.log('starting game')
@@ -249,41 +255,41 @@ import { $, debounce, handleDomElement } from '/utils.js'
   /* Handle client side events */
 
   const gameStateChangeEvents = {
-    [GAME_STATES.IDLE]: () => {
-      console.log('game state: ', GAME_STATES.IDLE)
+    [PLAYER_STATES.LOBBY]: () => {
+      socket.emit(SERVER_EVENTS.UPDATE_USER, gameStore.currentPlayer, 'status')
 
       view.showFormContainer()
 
       setGameHeader('')
       setFooterMessage('')
     },
-    [GAME_STATES.WAITING]: () => {
-      console.log('game state: ', GAME_STATES.WAITING)
+    [PLAYER_STATES.WAITING]: () => {
+      socket.emit(SERVER_EVENTS.UPDATE_USER, gameStore.currentPlayer, 'status')
+      // console.log('game state: ', PLAYER_STATES.WAITING)
 
       view.showGameContainer()
-
       setGameHeader('ESPERANDO')
-      setFooterMessage(`${gameStore.usersWaiting.length} usuarios esperando`)
+
+      view.showUsersWaiting()
     },
-    [GAME_STATES.STARTING]: () => {
-      console.log('game state: ', GAME_STATES.STARTING)
+    [PLAYER_STATES.STARTING]: () => {
+      console.log('game state: ', PLAYER_STATES.STARTING)
     },
-    [GAME_STATES.IN_PROGRESS]: () => {
-      console.log('game state: ', GAME_STATES.IN_PROGRESS)
+    [PLAYER_STATES.IN_PROGRESS]: () => {
+      console.log('game state: ', PLAYER_STATES.IN_PROGRESS)
     },
-    [GAME_STATES.FINISHED]: () => {
-      console.log('game state: ', GAME_STATES.FINISHED)
+    [PLAYER_STATES.FINISHED]: () => {
+      console.log('game state: ', PLAYER_STATES.FINISHED)
     }
   }
 
   const onGameStateChange = (newState) => {
     if (Object.keys(gameStateChangeEvents).includes(newState)) {
       gameStateChangeEvents[newState]()
-      socket.emit(SERVER_EVENTS.UPDATE_USER, gameStore.currentPlayer, 'status')
       return
     }
 
-    gameStateChangeEvents[GAME_STATES.IDLE]()
+    gameStateChangeEvents[PLAYER_STATES.LOBBY]()
   }
 
   gameStore.onGameStateChange = onGameStateChange
@@ -304,7 +310,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
 
     window.localStorage.setItem('name', name.value.trim())
 
-    gameStore.setGameStatus(GAME_STATES.WAITING)
+    gameStore.setGameStatus(PLAYER_STATES.WAITING)
   }
 
   $userForm.addEventListener('submit', handleFormSubmit)
@@ -312,7 +318,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
   const debouncedHandleInputNameChange = debounce(() => {
     getCurrentName()
     window.localStorage.setItem('name', name.value.trim())
-    socket.emit(GAME_STATES.IDLE, gameStore.currentPlayer)
+    socket.emit(PLAYER_STATES.LOBBY, gameStore.currentPlayer)
     socket.emit(SERVER_EVENTS.UPDATE_USER, gameStore.currentPlayer, 'username')
   }, 100)
 
@@ -320,13 +326,13 @@ import { $, debounce, handleDomElement } from '/utils.js'
     debouncedHandleInputNameChange()
   })
 
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keyup', (e) => {
     if (e.key === 'Escape' || e.code === 'Escape') {
       if (
-        gameStore.gameStatus === GAME_STATES.FINISHED ||
-        gameStore.gameStatus === GAME_STATES.WAITING
+        gameStore.gameStatus === PLAYER_STATES.FINISHED ||
+        gameStore.gameStatus === PLAYER_STATES.WAITING
       ) {
-        gameStore.setGameStatus(GAME_STATES.IDLE)
+        gameStore.setGameStatus(PLAYER_STATES.LOBBY)
       }
     }
   })

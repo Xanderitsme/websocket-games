@@ -2,40 +2,13 @@ import express from 'express'
 import { createServer } from 'node:http'
 import path from 'node:path'
 import { Server } from 'socket.io'
+import { PLAYER_STATES, SERVER_EVENTS, SERVER_STATES } from './consts.js'
 
 const port = process.env.PORT ?? 4321
 
 const app = express()
 const server = createServer(app)
 const io = new Server(server)
-
-const GAME_STATES = {
-  LOBBY: 'lobby',
-  WAITING: 'waiting',
-  START: 'start',
-  IN_PROGRESS: 'in_progress',
-  FINISHED: 'finished',
-  CLICK: 'click'
-}
-
-const SERVER_STATES = {
-  STARTING_GAME: 'starting_game',
-  GAME_IN_PROGRESS: 'game_in_progress',
-  GAME_FINISHED: 'game_finished',
-  IDLE: 'idle'
-}
-
-const SERVER_EVENTS = {
-  PLAYER_JOINED: 'player_joined',
-  PLAYER_DISCONNECTED: 'player_disconnected',
-  WAITING_PLAYERS: 'waiting_players',
-  UPDATE_USER: 'update_user',
-  UPDATE_ALL: 'update_all',
-  STARTING_GAME: 'starting_game',
-  START_GAME: 'start_game',
-  UPDATE_GAME: 'update_game',
-  FINISH_GAME: 'finish_game'
-}
 
 const connectedUsers = []
 
@@ -57,7 +30,6 @@ const findIndexUser = (id) => {
 io.on('connection', (socket) => {
   const handleNewPlayerJoin = () => {
     const user = getAuth(socket)
-    console.log(user)
 
     const index = connectedUsers.findIndex((p) => p.id === user.id)
 
@@ -96,38 +68,29 @@ io.on('connection', (socket) => {
 
       io.emit(SERVER_EVENTS.UPDATE_USER, storedUser, field)
     }
+
+    connectedUsers.push(user)
   })
 
-  function handleUserStatusChange(user) {
-    if (user.status === 'waiting') {
-      verifyNewWaitingUser(user)
+  const getUsersWaiting = () =>
+    connectedUsers.reduce((prev, user) => {
+      if (user.status === PLAYER_STATES.WAITING) {
+        prev++
+      }
+      return prev
+    }, 0)
 
-      const waitingUsers = connectedUsers.reduce((prev, user) => {
-        if (user.status === GAME_STATES.WAITING) {
-          prev++
-        }
-        return prev
-      }, 0)
-
+  const changeUserStateEvents = {
+    [PLAYER_STATES.WAITING]: () => {
       if (!interval) {
         interval = setInterval(() => {
-          io.emit(
-            GAME_STATES.WAITING,
-            `${waitingUsers} esperando a más jugadores... empezando en ${waitingTime}`
-          )
-
           if (waitingTime === 0) {
-            const currentWaitingUsers = connectedUsers.reduce((prev, user) => {
-              if (user.status === GAME_STATES.WAITING) {
-                prev++
-              }
-              return prev
-            }, 0)
+            const usersWaiting = getUsersWaiting()
 
-            if (currentWaitingUsers > 1) {
+            if (usersWaiting > 1) {
               clearInterval(interval)
               interval = null
-              startGame()
+              // startGame()
             } else {
               waitingTime = 5
             }
@@ -136,100 +99,104 @@ io.on('connection', (socket) => {
           }
         }, 1000)
       }
+    },
+    [PLAYER_STATES.LOBBY]: (user) => {
+      const index = findIndexUser(user.id)
+
+      if (index !== -1) {
+        if (connectedUsers[index].status === PLAYER_STATES.WAITING) {
+          // io.emit(SERVER_EVENTS.WAITING_PLAYERS, getUsersWaiting())
+        }
+      }
     }
-
-    console.log(user)
-
-    io.emit(SERVER_EVENTS.UPDATE_USER, user, 'status')
   }
 
-  // function verifyNewConnectedUser(user) {
+  function handleUserStatusChange(user) {
+    io.emit(SERVER_EVENTS.UPDATE_USER, user, 'status')
+
+    if (Object.keys(changeUserStateEvents).includes(user.status)) {
+      changeUserStateEvents[user.status](user)
+      return
+    }
+  }
+
+  // function verifyNewWaitingUser(user) {
   //   const index = connectedUsers.findIndex((u) => u.id === user.id)
 
   //   if (index !== -1) {
-  //     connectedUsers[index].username = user.username
-  //   } else {
-  //     connectedUsers.push(user)
+  //     connectedUsers.at(index).status = PLAYER_STATES.WAITING
   //   }
   // }
 
-  function verifyNewWaitingUser(user) {
-    const index = connectedUsers.findIndex((u) => u.id === user.id)
+  // function startGame() {
+  //   connectedUsers.forEach((user) => {
+  //     user.clickCount = 0
+  //     user.status = PLAYER_STATES.PLAYING
+  //   })
 
-    if (index !== -1) {
-      connectedUsers.at(index).status = GAME_STATES.WAITING
-    }
-  }
+  //   io.emit(PLAYER_STATES.STARTING, connectedUsers)
+  // }
 
-  function startGame() {
-    connectedUsers.forEach((user) => {
-      user.clickCount = 0
-      user.status = GAME_STATES.IN_PROGRESS
-    })
+  // socket.on(PLAYER_STATES.CLICK, (user) => {
+  //   const savedUser = connectedUsers.find((u) => u.id === user.id)
 
-    io.emit(GAME_STATES.START, connectedUsers)
-  }
+  //   if (!savedUser) {
+  //     return
+  //   }
 
-  socket.on(GAME_STATES.CLICK, (user) => {
-    const savedUser = connectedUsers.find((u) => u.id === user.id)
+  //   savedUser.clickCount++
+  //   io.emit(PLAYER_STATES.CLICK, connectedUsers)
 
-    if (!savedUser) {
-      return
-    }
+  //   if (
+  //     savedUser.clickCount >= 100 &&
+  //     savedUser.status !== PLAYER_STATES.FINISHED
+  //   ) {
+  //     connectedUsers.forEach((user) => {
+  //       user.status = PLAYER_STATES.FINISHED
+  //     })
 
-    savedUser.clickCount++
-    io.emit(GAME_STATES.CLICK, connectedUsers)
+  //     io.emit(PLAYER_STATES.FINISHED, connectedUsers)
+  //   }
+  // })
 
-    if (
-      savedUser.clickCount >= 100 &&
-      savedUser.status !== GAME_STATES.FINISHED
-    ) {
-      connectedUsers.forEach((user) => {
-        user.status = GAME_STATES.FINISHED
-      })
+  // socket.on(PLAYER_STATES.WAITING, (user) => {
+  //   verifyNewWaitingUser(user)
 
-      io.emit(GAME_STATES.FINISHED, connectedUsers)
-    }
-  })
+  //   const waitingUsers = connectedUsers.reduce((prev, user) => {
+  //     if (user.status === PLAYER_STATES.WAITING) {
+  //       prev++
+  //     }
+  //     return prev
+  //   }, 0)
 
-  socket.on(GAME_STATES.WAITING, (user) => {
-    verifyNewWaitingUser(user)
+  //   if (!interval) {
+  //     interval = setInterval(() => {
+  //       io.emit(
+  //         PLAYER_STATES.WAITING,
+  //         `${waitingUsers} esperando a más jugadores... empezando en ${waitingTime}`
+  //       )
 
-    const waitingUsers = connectedUsers.reduce((prev, user) => {
-      if (user.status === GAME_STATES.WAITING) {
-        prev++
-      }
-      return prev
-    }, 0)
+  //       if (waitingTime === 0) {
+  //         const currentWaitingUsers = connectedUsers.reduce((prev, user) => {
+  //           if (user.status === PLAYER_STATES.WAITING) {
+  //             prev++
+  //           }
+  //           return prev
+  //         }, 0)
 
-    if (!interval) {
-      interval = setInterval(() => {
-        io.emit(
-          GAME_STATES.WAITING,
-          `${waitingUsers} esperando a más jugadores... empezando en ${waitingTime}`
-        )
-
-        if (waitingTime === 0) {
-          const currentWaitingUsers = connectedUsers.reduce((prev, user) => {
-            if (user.status === GAME_STATES.WAITING) {
-              prev++
-            }
-            return prev
-          }, 0)
-
-          if (currentWaitingUsers > 1) {
-            clearInterval(interval)
-            interval = null
-            startGame()
-          } else {
-            waitingTime = 5
-          }
-        } else {
-          waitingTime--
-        }
-      }, 1000)
-    }
-  })
+  //         if (currentWaitingUsers > 1) {
+  //           clearInterval(interval)
+  //           interval = null
+  //           startGame()
+  //         } else {
+  //           waitingTime = 5
+  //         }
+  //       } else {
+  //         waitingTime--
+  //       }
+  //     }, 1000)
+  //   }
+  // })
 })
 
 app.use(express.static(path.join(process.cwd(), 'src/public')))
