@@ -1,3 +1,10 @@
+export const playerSchema = {
+  id: 'id',
+  username: 'username',
+  status: 'status',
+  clickCount: 'clickCount'
+}
+
 export const PLAYER_STATES = {
   LOBBY: 'lobby',
   WAITING: 'waiting',
@@ -24,3 +31,5 @@ export const SERVER_EVENTS = {
   UPDATE_GAME: 'update_game',
   FINISH_GAME: 'finish_game'
 }
+
+export const clickLimit = 100

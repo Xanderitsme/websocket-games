@@ -10,6 +10,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
   const $userForm = $('[data-id="form-user-data"]')
   const $lobbyMessage = $('[data-id="lobby-message"]')
   const $footerMessage = $('[data-id="footer-message"]')
+  const $temporalMessage = $('[data-id="temporal-message"]')
 
   if (
     !($formContainer instanceof HTMLElement) ||
@@ -18,7 +19,8 @@ import { $, debounce, handleDomElement } from '/utils.js'
     !($gameMessage instanceof HTMLElement) ||
     !($userForm instanceof HTMLFormElement) ||
     !($lobbyMessage instanceof HTMLElement) ||
-    !($footerMessage instanceof HTMLElement)
+    !($footerMessage instanceof HTMLElement) ||
+    !($temporalMessage instanceof HTMLElement)
   ) {
     return
   }
@@ -30,6 +32,13 @@ import { $, debounce, handleDomElement } from '/utils.js'
   }
 
   // Declare global constants
+
+  const playerSchema = {
+    id: 'id',
+    username: 'username',
+    status: 'status',
+    clickCount: 'clickCount'
+  }
 
   const PLAYER_STATES = {
     LOBBY: 'lobby',
@@ -43,7 +52,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
     STARTING_GAME: 'starting_game',
     GAME_IN_PROGRESS: 'game_in_progress',
     GAME_FINISHED: 'game_finished',
-    IDLE: PLAYER_STATES.LOBBY
+    IDLE: 'idle'
   }
 
   const SERVER_EVENTS = {
@@ -58,23 +67,25 @@ import { $, debounce, handleDomElement } from '/utils.js'
     FINISH_GAME: 'finish_game'
   }
 
+  const clickLimit = 100
+
   // Define game methods and properties
 
   const getId = () => {
-    const savedId = window.localStorage.getItem('id')
+    const savedId = window.localStorage.getItem(playerSchema.id)
 
     if (savedId) {
       return savedId
     }
 
     const newId = crypto.randomUUID()
-    window.localStorage.setItem('id', newId)
+    window.localStorage.setItem(playerSchema.id, newId)
 
     return newId
   }
 
   const getUsername = () => {
-    return window.localStorage.getItem('name') || ''
+    return window.localStorage.getItem(playerSchema.username) || ''
   }
 
   const gameStore = {
@@ -102,7 +113,9 @@ import { $, debounce, handleDomElement } from '/utils.js'
       })
     },
     get usersPlaying() {
-      return this.activePlayers.filter((player) => player.status === 'playing')
+      return this.activePlayers.filter(
+        (player) => player.status === PLAYER_STATES.PLAYING
+      )
     },
     setGameStatus(newState) {
       this.gameStatus = newState
@@ -137,6 +150,20 @@ import { $, debounce, handleDomElement } from '/utils.js'
       }
 
       this.activePlayers.push(player)
+    },
+    enableClickCounter() {
+      this.clickCount = 0
+      this.clickCounterEnabled = true
+    },
+    stopClickCounter() {
+      this.clickCounterEnabled = false
+    },
+    increaseClickCount() {
+      this.clickCount++
+
+      if (this.clickCount >= clickLimit) {
+        this.stopClickCounter()
+      }
     }
   }
 
@@ -145,13 +172,29 @@ import { $, debounce, handleDomElement } from '/utils.js'
   /* User views management */
 
   const [, setGameHeader] = handleDomElement($gameHeaderText)
-  const [, setMessage] = handleDomElement($gameMessage)
+  const [, setGameMessage] = handleDomElement($gameMessage)
   const [, setLobbyMessage] = handleDomElement($lobbyMessage)
   const [, setFooterMessage] = handleDomElement($footerMessage)
+  const [, setTempMessage] = handleDomElement($temporalMessage)
 
-  const setFooterMessageDebounced = debounce((value) => {
-    setFooterMessage(value)
-  }, 3000)
+  let timeout = null
+
+  const setTemporalMessage = (message, delay = 3000) => {
+    setTempMessage(message)
+    $temporalMessage.classList.add('opacity-70')
+    $temporalMessage.classList.remove('opacity-0')
+
+    if (timeout) {
+      clearTimeout(timeout)
+      timeout = null
+    }
+
+    timeout = setTimeout(() => {
+      $temporalMessage.classList.add('opacity-0')
+      $temporalMessage.classList.remove('opacity-70')
+      setTempMessage('')
+    }, delay)
+  }
 
   const view = {
     showOnlineUsers() {
@@ -159,30 +202,140 @@ import { $, debounce, handleDomElement } from '/utils.js'
         const header = `<div>Usuarios conectados: ${gameStore.activePlayers.length}</div>`
 
         const body = gameStore.activePlayers
-          .map((user) => `<div>⫸ ${user.username} (${user.status})`)
+          .map((user) => `<div>⫸ ${user.username} (${user.status})</div>`)
           .join('')
 
         setLobbyMessage(header + body)
       }
     },
     showNewConnectedUser(user) {
-      setFooterMessage(`El jugador ${user.username} se acaba de conectar!`)
-      setFooterMessageDebounced('')
+      setTemporalMessage(`${user.username} se acaba de conectar!`)
     },
     showDisconnectedUser(user) {
-      setFooterMessage(`El jugador ${user.username} se ha desconectado!`)
-      setFooterMessageDebounced('')
+      setTemporalMessage(`${user.username} se ha desconectado!`)
     },
     showUsersWaiting() {
-      setMessage(`${gameStore.usersWaiting.length} usuarios esperando...`)
+      if (gameStore.currentPlayer.status === PLAYER_STATES.WAITING) {
+        setFooterMessage(
+          `Jugadores en la sala de espera ${gameStore.usersWaiting.length} `
+        )
+      }
+    },
+    hideUsersWaiting() {
+      setFooterMessage('')
+    },
+    showGameRecomendation() {
+      setTemporalMessage(
+        `
+        Presiona J para incrementar el contador<br>
+        Alcanza 100 puntos para ganar
+        `,
+        5000
+      )
+    },
+    showWaitingStatus(waitingTime) {
+      if (gameStore.currentPlayer.status === PLAYER_STATES.WAITING) {
+        setGameHeader('Sala de espera')
+        const header = `<div>Jugadores listos:</div>`
+        const body = gameStore.usersWaiting
+          .map((user) => `<div>⪧ ${user.username}</div>`)
+          .join('')
+
+        const footer = `
+        <div class="mt-2">
+          ${
+            waitingTime === -1
+              ? 'Esperando a otros jugadores para iniciar'
+              : `La partida iniciará en ${waitingTime} segundos`
+          }
+        </div>
+        `
+
+        setGameMessage(header + body + footer)
+      }
+    },
+    showGameStatus(users) {
+      if (gameStore.currentPlayer.status === PLAYER_STATES.PLAYING) {
+        setGameHeader('Juego en curso')
+
+        const players = users
+          .map((user) => user)
+          .sort((a, b) => b.clickCount - a.clickCount)
+
+        const playersList = players
+          .map((player, index) => {
+            let styles = 'text-zinc-400'
+            let symbol = '⪧'
+
+            if (index === 0) {
+              styles = 'text-zinc-200 font-semibold mb-2 text-xl'
+              symbol = '⫸'
+            } else if (player.id === gameStore.currentPlayer.id) {
+              styles = 'text-zinc-200 font-semibold'
+            }
+
+            return `
+            <div class="${styles}">
+            ${symbol} ${player.username}: ${player.clickCount}
+            </div>
+          `
+          })
+          .join('')
+
+        setGameMessage(playersList)
+      }
+    },
+    showGameResults() {
+      if (gameStore.currentPlayer.status === PLAYER_STATES.FINISHED) {
+        setGameHeader('Juego terminado')
+
+        const players = gameStore.activePlayers
+          .map((user) => user)
+          .sort((a, b) => b.clickCount - a.clickCount)
+
+        const playersList = players
+          .map((player, index) => {
+            let styles = 'text-zinc-400'
+            let symbol = '⪧'
+            let extra = ''
+
+            if (index === 0) {
+              styles =
+                'text-emerald-300 font-semibold mb-4 text-xl drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]'
+              symbol = '⫸'
+              extra = '(Ganador)'
+            } else if (player.id === gameStore.currentPlayer.id) {
+              styles = 'text-zinc-200 font-semibold'
+              extra = '(Tú)'
+            }
+
+            return `
+            <div class="${styles}">
+              ${symbol} ${player.username}: ${player.clickCount} ${extra}
+            </div>
+            `
+          })
+          .join('')
+
+        const footer = `
+          <div class="text-sm mt-4 text-zinc-300 font-semibold">
+            Presiona ESC para volver al lobby
+          </div>
+          `
+
+        setGameMessage(playersList + footer)
+      }
     },
     showFormContainer() {
-      $formContainer.classList.remove('hidden')
       $gameContainer.classList.add('hidden')
+      $formContainer.classList.remove('hidden')
+      setGameHeader('')
+      setGameMessage('')
     },
     showGameContainer() {
       $formContainer.classList.add('hidden')
       $gameContainer.classList.remove('hidden')
+      setLobbyMessage('')
     }
   }
 
@@ -199,40 +352,60 @@ import { $, debounce, handleDomElement } from '/utils.js'
       view.showDisconnectedUser(user)
       view.showOnlineUsers()
     },
-    [SERVER_EVENTS.UPDATE_USER]: (user, field) => {
-      gameStore.updateActivePlayers(user, field)
+    [SERVER_EVENTS.UPDATE_USER]: (user) => {
+      gameStore.updateActivePlayers(user)
       view.showOnlineUsers()
-
-      if (
-        gameStore.currentPlayer.status === PLAYER_STATES.WAITING &&
-        field === 'status'
-      ) {
-        view.showUsersWaiting()
-      }
+      view.showUsersWaiting()
     },
     [SERVER_EVENTS.UPDATE_ALL]: (users) => {
       users.forEach((user) => {
-        gameStore.updateActivePlayers(user, 'status')
+        gameStore.updateActivePlayers(user, playerSchema.status)
       })
 
       view.showOnlineUsers()
     },
-    [SERVER_EVENTS.WAITING_PLAYERS]: (usersWaiting) => {
-      console.log('waiting players', usersWaiting)
-
+    [SERVER_EVENTS.WAITING_PLAYERS]: (waitingTime) => {
+      view.showWaitingStatus(waitingTime)
       view.showUsersWaiting()
     },
     [SERVER_EVENTS.STARTING_GAME]: (user) => {
       console.log('starting game')
     },
-    [SERVER_EVENTS.START_GAME]: (user) => {
-      console.log("Let's play!")
+    [SERVER_EVENTS.START_GAME]: (users) => {
+      users.forEach((user) => {
+        gameStore.updateActivePlayers(user, playerSchema.status)
+      })
+
+      if (gameStore.currentPlayer.status === PLAYER_STATES.WAITING) {
+        gameStore.setGameStatus(PLAYER_STATES.PLAYING)
+        view.hideUsersWaiting()
+        view.showGameRecomendation()
+        view.showGameStatus(users)
+        gameStore.enableClickCounter()
+      }
     },
     [SERVER_EVENTS.UPDATE_GAME]: (user) => {
       console.log('update game')
+
+      if (
+        gameStore.currentPlayer.status === PLAYER_STATES.PLAYING ||
+        gameStore.currentPlayer.status === PLAYER_STATES.FINISHED
+      ) {
+        gameStore.updateActivePlayers(user, playerSchema.clickCount)
+        view.showGameStatus(gameStore.activePlayers)
+      }
     },
-    [SERVER_EVENTS.FINISH_GAME]: (user) => {
+    [SERVER_EVENTS.FINISH_GAME]: (users) => {
       console.log("It's over")
+
+      users.forEach((user) => {
+        gameStore.updateActivePlayers(user, playerSchema.status)
+      })
+
+      if (gameStore.currentPlayer.status === PLAYER_STATES.PLAYING) {
+        gameStore.setGameStatus(PLAYER_STATES.FINISHED)
+        gameStore.stopClickCounter()
+      }
     }
   }
 
@@ -256,30 +429,44 @@ import { $, debounce, handleDomElement } from '/utils.js'
 
   const gameStateChangeEvents = {
     [PLAYER_STATES.LOBBY]: () => {
-      socket.emit(SERVER_EVENTS.UPDATE_USER, gameStore.currentPlayer, 'status')
+      console.log('game state: ', PLAYER_STATES.LOBBY)
+      socket.emit(
+        SERVER_EVENTS.UPDATE_USER,
+        gameStore.currentPlayer,
+        playerSchema.status
+      )
 
       view.showFormContainer()
 
-      setGameHeader('')
       setFooterMessage('')
     },
     [PLAYER_STATES.WAITING]: () => {
-      socket.emit(SERVER_EVENTS.UPDATE_USER, gameStore.currentPlayer, 'status')
-      // console.log('game state: ', PLAYER_STATES.WAITING)
+      console.log('game state: ', PLAYER_STATES.WAITING)
+      socket.emit(
+        SERVER_EVENTS.UPDATE_USER,
+        gameStore.currentPlayer,
+        playerSchema.status
+      )
 
       view.showGameContainer()
-      setGameHeader('ESPERANDO')
-
       view.showUsersWaiting()
     },
     [PLAYER_STATES.STARTING]: () => {
       console.log('game state: ', PLAYER_STATES.STARTING)
     },
+    [PLAYER_STATES.PLAYING]: () => {
+      console.log('game state: ', PLAYER_STATES.PLAYING)
+      // view.showGameStatus()
+    },
     [PLAYER_STATES.IN_PROGRESS]: () => {
       console.log('game state: ', PLAYER_STATES.IN_PROGRESS)
+      view.showGameContainer()
     },
     [PLAYER_STATES.FINISHED]: () => {
       console.log('game state: ', PLAYER_STATES.FINISHED)
+      view.showGameContainer()
+
+      view.showGameResults()
     }
   }
 
@@ -296,9 +483,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
 
   const [name, setName, getCurrentName] = handleDomElement($nameInput)
 
-  if (getUsername()) {
-    setName(getUsername())
-  }
+  setName(getUsername() ?? '')
 
   const handleFormSubmit = (e) => {
     e.preventDefault()
@@ -308,7 +493,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
       return
     }
 
-    window.localStorage.setItem('name', name.value.trim())
+    window.localStorage.setItem(playerSchema.username, name.value.trim())
 
     gameStore.setGameStatus(PLAYER_STATES.WAITING)
   }
@@ -317,9 +502,9 @@ import { $, debounce, handleDomElement } from '/utils.js'
 
   const debouncedHandleInputNameChange = debounce(() => {
     getCurrentName()
-    window.localStorage.setItem('name', name.value.trim())
-    socket.emit(PLAYER_STATES.LOBBY, gameStore.currentPlayer)
-    socket.emit(SERVER_EVENTS.UPDATE_USER, gameStore.currentPlayer, 'username')
+    window.localStorage.setItem(playerSchema.username, name.value.trim())
+
+    gameStore.setGameStatus(PLAYER_STATES.LOBBY)
   }, 100)
 
   $nameInput.addEventListener('input', () => {
@@ -327,6 +512,21 @@ import { $, debounce, handleDomElement } from '/utils.js'
   })
 
   document.addEventListener('keyup', (e) => {
+    if (e.key.toLowerCase() === 'j') {
+      if (
+        gameStore.clickCounterEnabled &&
+        gameStore.gameStatus === PLAYER_STATES.PLAYING
+      ) {
+        gameStore.increaseClickCount()
+
+        socket.emit(
+          SERVER_EVENTS.UPDATE_USER,
+          gameStore.currentPlayer,
+          playerSchema.clickCount
+        )
+      }
+    }
+
     if (e.key === 'Escape' || e.code === 'Escape') {
       if (
         gameStore.gameStatus === PLAYER_STATES.FINISHED ||

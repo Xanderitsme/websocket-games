@@ -91,7 +91,7 @@
               Play!
             </button>
           </form>
-          <div data-id="lobby-message" class="text-zinc-400"></div>
+          <div data-id="lobby-message" class="text-zinc-400 mt-4"></div>
         </section>
 
         <section
@@ -99,14 +99,27 @@
           data-id="game-container"
         >
           <header>
-            <h2 data-id="game-header-text" class="text-center"></h2>
+            <h2
+              data-id="game-header-text"
+              class="text-center font-semibold"
+            ></h2>
           </header>
-          <div data-id="game-message" class="text-zinc-400"></div>
+          <div data-id="game-message" class="text-zinc-400 mt-4"></div>
         </section>
       </main>
 
       <footer class="flex flex-col gap-2 px-5 py-6 mt-auto">
-        <div data-id="footer-message"></div>
+        <div class="flex justify-between items-end">
+          <div
+            data-id="footer-message"
+            class="font-semibold text-zinc-400"
+          ></div>
+          <div
+            data-id="temporal-message"
+            class="font-semibold text-end p-3 bg-zinc-900 rounded-md transition opacity-70"
+          ></div>
+        </div>
+
         <div class="flex justify-center">
           <a
             href="https://github.com/Xanderitsme/websocket-game.git"
@@ -121,16 +134,6 @@
             </svg>
           </a>
         </div>
-        <p class="text-center text-zinc-500 dark:text-zinc-600">
-          Created by:
-          <a
-            href="https://github.com/Xanderitsme"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <span class="font-semibold text-emerald-500">.__.</span>
-          </a>
-        </p>
       </footer>
     </div>
   </body>

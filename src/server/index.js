@@ -2,7 +2,13 @@ import express from 'express'
 import { createServer } from 'node:http'
 import path from 'node:path'
 import { Server } from 'socket.io'
-import { PLAYER_STATES, SERVER_EVENTS, SERVER_STATES } from './consts.js'
+import {
+  clickLimit,
+  PLAYER_STATES,
+  playerSchema,
+  SERVER_EVENTS,
+  SERVER_STATES
+} from './consts.js'
 
 const port = process.env.PORT ?? 4321
 
@@ -12,8 +18,8 @@ const io = new Server(server)
 
 const connectedUsers = []
 
-let waitingTime = 5
-let interval
+let waitingTime = -1
+let interval = null
 
 const getAuth = (socket) => {
   return socket.handshake.auth
@@ -27,20 +33,138 @@ const findIndexUser = (id) => {
   return connectedUsers.findIndex((u) => u.id === id)
 }
 
-io.on('connection', (socket) => {
-  const handleNewPlayerJoin = () => {
-    const user = getAuth(socket)
-
-    const index = connectedUsers.findIndex((p) => p.id === user.id)
-
-    if (index === -1) {
-      connectedUsers.push(user)
+const getUsersWaiting = () =>
+  connectedUsers.reduce((prev, user) => {
+    if (user.status === PLAYER_STATES.WAITING) {
+      prev++
     }
+    return prev
+  }, 0)
 
-    return user
+const startGame = () => {
+  connectedUsers.forEach((user) => {
+    if (user.status === PLAYER_STATES.WAITING) {
+      user.clickCount = 0
+      user.status = PLAYER_STATES.PLAYING
+    }
+  })
+
+  io.emit(SERVER_EVENTS.START_GAME, connectedUsers)
+}
+
+const changeUserStateEvents = {
+  [PLAYER_STATES.LOBBY]: (user) => {
+    const index = findIndexUser(user.id)
+
+    if (index !== -1) {
+      if (connectedUsers[index].username !== user.username) {
+        connectedUsers[index].username = user.username
+
+        io.emit(
+          SERVER_EVENTS.UPDATE_USER,
+          connectedUsers[index],
+          playerSchema.username
+        )
+      }
+
+      if (connectedUsers[index].status === PLAYER_STATES.WAITING) {
+        io.emit(SERVER_EVENTS.WAITING_PLAYERS, waitingTime)
+      }
+    }
+  },
+  [PLAYER_STATES.WAITING]: () => {
+    io.emit(SERVER_EVENTS.WAITING_PLAYERS, waitingTime)
+
+    const initialWaitingTime = 5
+
+    if (!interval) {
+      waitingTime = initialWaitingTime
+
+      interval = setInterval(() => {
+        const usersWaiting = getUsersWaiting()
+
+        if (usersWaiting < 2) {
+          clearInterval(interval)
+          interval = null
+          io.emit(SERVER_EVENTS.WAITING_PLAYERS, -1)
+          waitingTime = -1
+          return
+        }
+
+        io.emit(SERVER_EVENTS.WAITING_PLAYERS, waitingTime)
+
+        if (waitingTime === 0) {
+          if (usersWaiting > 1) {
+            clearInterval(interval)
+            interval = null
+            startGame()
+          } else {
+            waitingTime = initialWaitingTime
+          }
+        } else {
+          waitingTime--
+        }
+      }, 1000)
+    }
+  },
+  [PLAYER_STATES.STARTING]: () => {},
+  [PLAYER_STATES.PLAYING]: () => {},
+  [PLAYER_STATES.FINISHED]: () => {}
+}
+
+const handleUserStatusChange = (user) => {
+  io.emit(SERVER_EVENTS.UPDATE_USER, user, playerSchema.status)
+
+  if (Object.keys(changeUserStateEvents).includes(user.status)) {
+    changeUserStateEvents[user.status](user)
+  }
+}
+
+const finishGame = (user) => {
+  connectedUsers.forEach((user) => {
+    if (user.status === PLAYER_STATES.PLAYING) {
+      user.status = PLAYER_STATES.FINISHED
+    }
+  })
+
+  const index = findIndexUser(user.id)
+
+  if (index !== -1) {
+    io.emit(SERVER_EVENTS.UPDATE_GAME, connectedUsers[index])
   }
 
-  io.emit(SERVER_EVENTS.PLAYER_JOINED, handleNewPlayerJoin())
+  io.emit(SERVER_EVENTS.FINISH_GAME, connectedUsers)
+}
+
+const handleUserClickCountUpdate = (user) => {
+  const index = findIndexUser(user.id)
+
+  if (index !== -1) {
+    connectedUsers[index].clickCount++
+
+    if (connectedUsers[index].clickCount >= clickLimit) {
+      finishGame(user)
+      return
+    }
+
+    io.emit(SERVER_EVENTS.UPDATE_GAME, connectedUsers[index])
+  }
+}
+
+const handleNewPlayerJoin = (socket) => {
+  const user = getAuth(socket)
+
+  const index = connectedUsers.findIndex((p) => p.id === user.id)
+
+  if (index === -1) {
+    connectedUsers.push(user)
+  }
+
+  return user
+}
+
+io.on('connection', (socket) => {
+  io.emit(SERVER_EVENTS.PLAYER_JOINED, handleNewPlayerJoin(socket))
   io.emit(SERVER_EVENTS.UPDATE_ALL, connectedUsers)
 
   socket.on('disconnect', () => {
@@ -59,144 +183,24 @@ io.on('connection', (socket) => {
     const storedUser = findUser(user.id)
 
     if (storedUser) {
-      storedUser[field] = user[field]
-
-      if (field === 'status') {
-        handleUserStatusChange(storedUser)
+      if (field === playerSchema.status) {
+        handleUserStatusChange(user)
+        storedUser[field] = user[field]
         return
       }
 
+      if (field === playerSchema.clickCount) {
+        handleUserClickCountUpdate(user)
+        storedUser[field] = user[field]
+        return
+      }
+
+      storedUser[field] = user[field]
       io.emit(SERVER_EVENTS.UPDATE_USER, storedUser, field)
     }
 
     connectedUsers.push(user)
   })
-
-  const getUsersWaiting = () =>
-    connectedUsers.reduce((prev, user) => {
-      if (user.status === PLAYER_STATES.WAITING) {
-        prev++
-      }
-      return prev
-    }, 0)
-
-  const changeUserStateEvents = {
-    [PLAYER_STATES.WAITING]: () => {
-      if (!interval) {
-        interval = setInterval(() => {
-          if (waitingTime === 0) {
-            const usersWaiting = getUsersWaiting()
-
-            if (usersWaiting > 1) {
-              clearInterval(interval)
-              interval = null
-              // startGame()
-            } else {
-              waitingTime = 5
-            }
-          } else {
-            waitingTime--
-          }
-        }, 1000)
-      }
-    },
-    [PLAYER_STATES.LOBBY]: (user) => {
-      const index = findIndexUser(user.id)
-
-      if (index !== -1) {
-        if (connectedUsers[index].status === PLAYER_STATES.WAITING) {
-          // io.emit(SERVER_EVENTS.WAITING_PLAYERS, getUsersWaiting())
-        }
-      }
-    }
-  }
-
-  function handleUserStatusChange(user) {
-    io.emit(SERVER_EVENTS.UPDATE_USER, user, 'status')
-
-    if (Object.keys(changeUserStateEvents).includes(user.status)) {
-      changeUserStateEvents[user.status](user)
-      return
-    }
-  }
-
-  // function verifyNewWaitingUser(user) {
-  //   const index = connectedUsers.findIndex((u) => u.id === user.id)
-
-  //   if (index !== -1) {
-  //     connectedUsers.at(index).status = PLAYER_STATES.WAITING
-  //   }
-  // }
-
-  // function startGame() {
-  //   connectedUsers.forEach((user) => {
-  //     user.clickCount = 0
-  //     user.status = PLAYER_STATES.PLAYING
-  //   })
-
-  //   io.emit(PLAYER_STATES.STARTING, connectedUsers)
-  // }
-
-  // socket.on(PLAYER_STATES.CLICK, (user) => {
-  //   const savedUser = connectedUsers.find((u) => u.id === user.id)
-
-  //   if (!savedUser) {
-  //     return
-  //   }
-
-  //   savedUser.clickCount++
-  //   io.emit(PLAYER_STATES.CLICK, connectedUsers)
-
-  //   if (
-  //     savedUser.clickCount >= 100 &&
-  //     savedUser.status !== PLAYER_STATES.FINISHED
-  //   ) {
-  //     connectedUsers.forEach((user) => {
-  //       user.status = PLAYER_STATES.FINISHED
-  //     })
-
-  //     io.emit(PLAYER_STATES.FINISHED, connectedUsers)
-  //   }
-  // })
-
-  // socket.on(PLAYER_STATES.WAITING, (user) => {
-  //   verifyNewWaitingUser(user)
-
-  //   const waitingUsers = connectedUsers.reduce((prev, user) => {
-  //     if (user.status === PLAYER_STATES.WAITING) {
-  //       prev++
-  //     }
-  //     return prev
-  //   }, 0)
-
-  //   if (!interval) {
-  //     interval = setInterval(() => {
-  //       io.emit(
-  //         PLAYER_STATES.WAITING,
-  //         `${waitingUsers} esperando a más jugadores... empezando en ${waitingTime}`
-  //       )
-
-  //       if (waitingTime === 0) {
-  //         const currentWaitingUsers = connectedUsers.reduce((prev, user) => {
-  //           if (user.status === PLAYER_STATES.WAITING) {
-  //             prev++
-  //           }
-  //           return prev
-  //         }, 0)
-
-  //         if (currentWaitingUsers > 1) {
-  //           clearInterval(interval)
-  //           interval = null
-  //           startGame()
-  //         } else {
-  //           waitingTime = 5
-  //         }
-  //       } else {
-  //         waitingTime--
-  //       }
-  //     }, 1000)
-  //   }
-  // })
 })
 
 app.use(express.static(path.join(process.cwd(), 'src/public')))
