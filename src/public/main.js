@@ -511,6 +511,21 @@ import { $, debounce, handleDomElement } from '/utils.js'
     debouncedHandleInputNameChange()
   })
 
+  document.addEventListener('click', () => {
+    if (
+      gameStore.clickCounterEnabled &&
+      gameStore.gameStatus === PLAYER_STATES.PLAYING
+    ) {
+      gameStore.increaseClickCount()
+
+      socket.emit(
+        SERVER_EVENTS.UPDATE_USER,
+        gameStore.currentPlayer,
+        playerSchema.clickCount
+      )
+    }
+  })
+
   document.addEventListener('keyup', (e) => {
     if (e.key.toLowerCase() === 'j') {
       if (
@@ -534,6 +549,22 @@ import { $, debounce, handleDomElement } from '/utils.js'
       ) {
         gameStore.setGameStatus(PLAYER_STATES.LOBBY)
       }
+    }
+  })
+
+  const $exitButton = $('[data-id="exit-button"]')
+
+  if (!($exitButton instanceof HTMLButtonElement)) {
+    console.log('boton de salida no encontrado')
+    return
+  }
+
+  $exitButton.addEventListener('click', () => {
+    if (
+      gameStore.gameStatus === PLAYER_STATES.FINISHED ||
+      gameStore.gameStatus === PLAYER_STATES.WAITING
+    ) {
+      gameStore.setGameStatus(PLAYER_STATES.LOBBY)
     }
   })
 })()
