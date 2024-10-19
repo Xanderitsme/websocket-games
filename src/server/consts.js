@@ -29,7 +29,8 @@ export const SERVER_EVENTS = {
   STARTING_GAME: 'starting_game',
   START_GAME: 'start_game',
   UPDATE_GAME: 'update_game',
-  FINISH_GAME: 'finish_game'
+  FINISH_GAME: 'finish_game',
+  UPDATE_USER_SQUARE: 'update_user_square'
 }
 
 export const clickLimit = 100

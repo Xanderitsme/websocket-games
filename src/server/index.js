@@ -197,6 +197,21 @@ io.on('connection', (socket) => {
 
       storedUser[field] = user[field]
       io.emit(SERVER_EVENTS.UPDATE_USER, storedUser, field)
+      return
+    }
+
+    connectedUsers.push(user)
+  })
+
+  socket.on(SERVER_EVENTS.UPDATE_USER_SQUARE, (user) => {
+    const storedUser = findUser(user.id)
+
+    if (storedUser) {
+      storedUser.position.x = user.position.x
+      storedUser.position.y = user.position.y
+
+      io.emit(SERVER_EVENTS.UPDATE_USER_SQUARE, storedUser)
+      return
     }
 
     connectedUsers.push(user)

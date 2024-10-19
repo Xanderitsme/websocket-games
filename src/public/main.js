@@ -1,6 +1,8 @@
 import { io } from '/socket.io.esm.min.js'
 import { $, debounce, handleDomElement } from '/utils.js'
 ;(() => {
+  // <span class="text-emerald-300 font-semibold mb-4 text-xl drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]">⫷ *c duerme*⫸</span>
+
   // Find all required html elements
 
   const $formContainer = $('[data-id="form-container"]')
