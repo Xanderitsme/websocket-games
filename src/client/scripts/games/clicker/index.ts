@@ -1,5 +1,11 @@
-import { io } from '/socket.io.esm.min.js'
-import { $, debounce, handleDomElement } from '/utils.js'
+import { PLAYER_STATES, playerSchema, SERVER_EVENTS } from '@/consts'
+import { $, debounce, handleDomElement } from '@/scripts/utils'
+import type {
+  ClickerPlayerKeys,
+  ClickerPlayerType,
+  PlayerStatus
+} from '@/types'
+import { io } from 'socket.io-client'
 ;(() => {
   // <span class="text-emerald-300 font-semibold mb-4 text-xl drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]">⫷ *c duerme*⫸</span>
 
@@ -27,46 +33,10 @@ import { $, debounce, handleDomElement } from '/utils.js'
     return
   }
 
-  const $nameInput = $userForm.elements['name']
+  const $nameInput = $userForm.elements['name' as any]
 
   if (!($nameInput instanceof HTMLInputElement)) {
     return
-  }
-
-  // Declare global constants
-
-  const playerSchema = {
-    id: 'id',
-    username: 'username',
-    status: 'status',
-    clickCount: 'clickCount'
-  }
-
-  const PLAYER_STATES = {
-    LOBBY: 'lobby',
-    WAITING: 'waiting',
-    STARTING: 'starting',
-    PLAYING: 'playing',
-    FINISHED: 'finished'
-  }
-
-  const SERVER_STATES = {
-    STARTING_GAME: 'starting_game',
-    GAME_IN_PROGRESS: 'game_in_progress',
-    GAME_FINISHED: 'game_finished',
-    IDLE: 'idle'
-  }
-
-  const SERVER_EVENTS = {
-    PLAYER_JOINED: 'player_joined',
-    PLAYER_DISCONNECTED: 'player_disconnected',
-    WAITING_PLAYERS: 'waiting_players',
-    UPDATE_USER: 'update_user',
-    UPDATE_ALL: 'update_all',
-    STARTING_GAME: 'starting_game',
-    START_GAME: 'start_game',
-    UPDATE_GAME: 'update_game',
-    FINISH_GAME: 'finish_game'
   }
 
   const clickLimit = 100
@@ -91,11 +61,13 @@ import { $, debounce, handleDomElement } from '/utils.js'
   }
 
   const gameStore = {
-    activePlayers: [],
+    activePlayers: [] as ClickerPlayerType[],
     clickCount: 0,
     clickCounterEnabled: false,
-    gameStatus: PLAYER_STATES.LOBBY,
-    onGameStateChange: () => {},
+    gameStatus: PLAYER_STATES.LOBBY as PlayerStatus,
+    onGameStateChange: (newState: PlayerStatus) => {
+      console.log(newState)
+    },
     get currentPlayer() {
       return {
         id: getId(),
@@ -119,7 +91,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
         (player) => player.status === PLAYER_STATES.PLAYING
       )
     },
-    setGameStatus(newState) {
+    setGameStatus(newState: PlayerStatus) {
       this.gameStatus = newState
 
       const index = this.activePlayers.findIndex(
@@ -132,19 +104,25 @@ import { $, debounce, handleDomElement } from '/utils.js'
 
       this.onGameStateChange(newState)
     },
-    disconnectPlayer(player) {
+    disconnectPlayer(player: ClickerPlayerType) {
       const index = this.activePlayers.findIndex((p) => p.id === player.id)
 
       if (index !== -1) {
         this.activePlayers.splice(index, 1)
       }
     },
-    updateActivePlayers(player, field) {
+    updateActivePlayers(player: ClickerPlayerType, field?: ClickerPlayerKeys) {
       const index = this.activePlayers.findIndex((p) => p.id === player.id)
 
       if (index !== -1) {
         if (field) {
-          this.activePlayers[index][field] = player[field]
+          if (field === playerSchema.status) {
+            this.activePlayers[index].status = player.status
+          } else if (field === playerSchema.clickCount) {
+            this.activePlayers[index].clickCount = player.clickCount
+          } else {
+            this.activePlayers[index][field] = player[field]
+          }
         } else {
           this.activePlayers[index] = player
         }
@@ -177,11 +155,11 @@ import { $, debounce, handleDomElement } from '/utils.js'
   const [, setGameMessage] = handleDomElement($gameMessage)
   const [, setLobbyMessage] = handleDomElement($lobbyMessage)
   const [, setFooterMessage] = handleDomElement($footerMessage)
-  const [, setTempMessage] = handleDomElement($temporalMessage)
+  const [, setTempMessage] = handleDomElement<string>($temporalMessage)
 
-  let timeout = null
+  let timeout: ReturnType<typeof setTimeout> | null = null
 
-  const setTemporalMessage = (message, delay = 3000) => {
+  const setTemporalMessage = (message: string, delay = 3000) => {
     setTempMessage(message)
     $temporalMessage.classList.add('opacity-70')
     $temporalMessage.classList.remove('opacity-0')
@@ -210,10 +188,10 @@ import { $, debounce, handleDomElement } from '/utils.js'
         setLobbyMessage(header + body)
       }
     },
-    showNewConnectedUser(user) {
+    showNewConnectedUser(user: ClickerPlayerType) {
       setTemporalMessage(`${user.username} se acaba de conectar!`)
     },
-    showDisconnectedUser(user) {
+    showDisconnectedUser(user: ClickerPlayerType) {
       setTemporalMessage(`${user.username} se ha desconectado!`)
     },
     showUsersWaiting() {
@@ -235,7 +213,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
         5000
       )
     },
-    showWaitingStatus(waitingTime) {
+    showWaitingStatus(waitingTime: number) {
       if (gameStore.currentPlayer.status === PLAYER_STATES.WAITING) {
         setGameHeader('Sala de espera')
         const header = `<div>Jugadores listos:</div>`
@@ -256,7 +234,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
         setGameMessage(header + body + footer)
       }
     },
-    showGameStatus(users) {
+    showGameStatus(users: ClickerPlayerType[]) {
       if (gameStore.currentPlayer.status === PLAYER_STATES.PLAYING) {
         setGameHeader('Juego en curso')
 
@@ -344,36 +322,36 @@ import { $, debounce, handleDomElement } from '/utils.js'
   /* Handle socket events */
 
   const socketEvents = {
-    [SERVER_EVENTS.PLAYER_JOINED]: (user) => {
+    [SERVER_EVENTS.PLAYER_JOINED]: (user: ClickerPlayerType) => {
       gameStore.updateActivePlayers(user)
       view.showNewConnectedUser(user)
       view.showOnlineUsers()
     },
-    [SERVER_EVENTS.PLAYER_DISCONNECTED]: (user) => {
+    [SERVER_EVENTS.PLAYER_DISCONNECTED]: (user: ClickerPlayerType) => {
       gameStore.disconnectPlayer(user)
       view.showDisconnectedUser(user)
       view.showOnlineUsers()
     },
-    [SERVER_EVENTS.UPDATE_USER]: (user) => {
+    [SERVER_EVENTS.UPDATE_USER]: (user: ClickerPlayerType) => {
       gameStore.updateActivePlayers(user)
       view.showOnlineUsers()
       view.showUsersWaiting()
     },
-    [SERVER_EVENTS.UPDATE_ALL]: (users) => {
+    [SERVER_EVENTS.UPDATE_ALL]: (users: ClickerPlayerType[]) => {
       users.forEach((user) => {
         gameStore.updateActivePlayers(user, playerSchema.status)
       })
 
       view.showOnlineUsers()
     },
-    [SERVER_EVENTS.WAITING_PLAYERS]: (waitingTime) => {
+    [SERVER_EVENTS.WAITING_PLAYERS]: (waitingTime: number) => {
       view.showWaitingStatus(waitingTime)
       view.showUsersWaiting()
     },
-    [SERVER_EVENTS.STARTING_GAME]: (user) => {
+    [SERVER_EVENTS.STARTING_GAME]: () => {
       console.log('starting game')
     },
-    [SERVER_EVENTS.START_GAME]: (users) => {
+    [SERVER_EVENTS.START_GAME]: (users: ClickerPlayerType[]) => {
       users.forEach((user) => {
         gameStore.updateActivePlayers(user, playerSchema.status)
       })
@@ -386,7 +364,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
         gameStore.enableClickCounter()
       }
     },
-    [SERVER_EVENTS.UPDATE_GAME]: (user) => {
+    [SERVER_EVENTS.UPDATE_GAME]: (user: ClickerPlayerType) => {
       console.log('update game')
 
       if (
@@ -397,7 +375,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
         view.showGameStatus(gameStore.activePlayers)
       }
     },
-    [SERVER_EVENTS.FINISH_GAME]: (users) => {
+    [SERVER_EVENTS.FINISH_GAME]: (users: ClickerPlayerType[]) => {
       console.log("It's over")
 
       users.forEach((user) => {
@@ -411,13 +389,14 @@ import { $, debounce, handleDomElement } from '/utils.js'
     }
   }
 
-  const registerSocketEvents = (socket) => {
+  const registerSocketEvents = (socket: any) => {
     for (const [event, handler] of Object.entries(socketEvents)) {
       socket.on(event, handler)
     }
   }
 
-  const socket = io({
+  const socket = io('http://localhost:3000/', {
+    reconnectionDelayMax: 10000,
     auth: {
       id: getId(),
       username: getUsername(),
@@ -458,11 +437,8 @@ import { $, debounce, handleDomElement } from '/utils.js'
     },
     [PLAYER_STATES.PLAYING]: () => {
       console.log('game state: ', PLAYER_STATES.PLAYING)
-      // view.showGameStatus()
-    },
-    [PLAYER_STATES.IN_PROGRESS]: () => {
-      console.log('game state: ', PLAYER_STATES.IN_PROGRESS)
       view.showGameContainer()
+      // view.showGameStatus()
     },
     [PLAYER_STATES.FINISHED]: () => {
       console.log('game state: ', PLAYER_STATES.FINISHED)
@@ -472,7 +448,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
     }
   }
 
-  const onGameStateChange = (newState) => {
+  const onGameStateChange = (newState: PlayerStatus) => {
     if (Object.keys(gameStateChangeEvents).includes(newState)) {
       gameStateChangeEvents[newState]()
       return
@@ -483,11 +459,11 @@ import { $, debounce, handleDomElement } from '/utils.js'
 
   gameStore.onGameStateChange = onGameStateChange
 
-  const [name, setName, getCurrentName] = handleDomElement($nameInput)
+  const [name, setName, getCurrentName] = handleDomElement<string>($nameInput)
 
   setName(getUsername() ?? '')
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = (e: SubmitEvent) => {
     e.preventDefault()
     getCurrentName()
 

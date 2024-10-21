@@ -1,45 +1,61 @@
-import { io } from '/socket.io.esm.min.js'
-import { $, debounce, handleDomElement } from '/utils.js'
+import { SERVER_EVENTS } from '@/consts'
+// import { io } from '@/scripts/lib/socket.io.esm.min.js'
+import { $ } from '@/scripts/utils'
+import type {
+  ControlObject,
+  CreatePlayerArgs,
+  CreatePlayerReturnType,
+  PlayerType
+} from '@/types'
+import { io } from 'socket.io-client'
 ;(() => {
-  const SERVER_EVENTS = {
-    PLAYER_JOINED: 'player_joined',
-    PLAYER_DISCONNECTED: 'player_disconnected',
-    UPDATE_USER_SQUARE: 'update_user_square',
-    UPDATE_ALL: 'update_all'
-  }
-
   const appSize = 700
 
   const app = $('#app')
 
-  app.classList.add(`h-[${appSize}px]`, `w-[${appSize}px]`)
+  if (!(app instanceof HTMLElement)) {
+    return
+  }
+
+  // app.classList.add(`h-[${appSize}px]`, `w-[${appSize}px]`)
+  app.style.height = `${appSize}px`
+  app.style.width = `${appSize}px`
 
   const createPlayer = ({
     id,
     parent,
-    controls = null,
+    controls,
     squareSize = 20,
-    position = null,
+    position,
     color = 'white',
     speed = 5,
-    emitMovement = null,
+    emitMovement,
     boostStyles = ''
-  }) => {
+  }: CreatePlayerArgs) => {
     if (!(parent instanceof HTMLElement)) {
-      return
+      throw new Error('Parent not found')
     }
 
     const newSquare = document.createElement('div')
-    newSquare.className = `bg-${color} w-[${squareSize}px] h-[${squareSize}px] rounded absolute`
+    newSquare.style.height = `${squareSize}px`
+    newSquare.style.width = `${squareSize}px`
+    newSquare.className = `bg-${color} rounded absolute transition`
+
     newSquare.setAttribute('data-id', id)
 
     const boostStylesArray = boostStyles.split(' ')
 
     parent.appendChild(newSquare)
 
+    const $squareElement = $(`[data-id="${id}"]`)
+
+    if (!($squareElement instanceof HTMLElement)) {
+      throw new Error('Child element not found')
+    }
+
     const squareData = {
       id,
-      domElement: $(`[data-id="${id}"]`),
+      domElement: $squareElement,
       posX: 0,
       posY: 0,
       speedXAxis: 0,
@@ -59,7 +75,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
           y: this.posY
         }
       },
-      setPosition({ x, y }) {
+      setPosition({ x, y }: { x: number; y: number }) {
         this.posX = x
         this.posY = y
 
@@ -73,11 +89,11 @@ import { $, debounce, handleDomElement } from '/utils.js'
     }
 
     if (controls) {
-      let initialTime = null
+      let initialTime: number = 0
 
       const moveSquare = () => {
         if (squareData.controls.boost) {
-          if (!initialTime) {
+          if (initialTime === 0) {
             initialTime = new Date().getTime()
           } else {
             const currentTime = new Date().getTime()
@@ -85,7 +101,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
             const elapsedTime = currentTime - initialTime
 
             if (elapsedTime < 1000) {
-              squareData.speed = speed * 1.5
+              squareData.speed = speed * 2
               squareData.domElement.classList.add(...boostStylesArray)
             } else {
               squareData.speed = speed
@@ -94,7 +110,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
           }
         } else {
           squareData.speed = speed
-          initialTime = null
+          initialTime = 0
           squareData.domElement.classList.remove(...boostStylesArray)
         }
 
@@ -179,15 +195,15 @@ import { $, debounce, handleDomElement } from '/utils.js'
   }
 
   // const controls = {
-  //   ['ArrowLeft']: 'left',
-  //   ['ArrowRight']: 'right',
-  //   ['ArrowUp']: 'up',
-  //   ['ArrowDown']: 'down',
-  //   ['a']: 'boost',
-  //   ['s']: 'shoot'
+  //   ['ArrowLeft']: controlValues.left,
+  //   ['ArrowRight']: controlValues.right,
+  //   ['ArrowUp']: controlValues.up,
+  //   ['ArrowDown']: controlValues.down,
+  //   ['a']: controlValues.boost,
+  //   ['s']: controlValues.shoot
   // }
 
-  const controls = {
+  const controls: ControlObject = {
     j: 'left',
     l: 'right',
     i: 'up',
@@ -196,32 +212,37 @@ import { $, debounce, handleDomElement } from '/utils.js'
     s: 'shoot'
   }
 
-  const socket = io({
+  const socket = io('http://localhost:3000/', {
+    reconnectionDelayMax: 10000,
     auth: {
       id: getId(),
       position: {
-        x: 0,
-        y: 0
+        x: 340,
+        y: 340
       }
     }
   })
 
-  const emitMovement = (player) => {
+  const emitMovement = (player: PlayerType) => {
     socket.emit(SERVER_EVENTS.UPDATE_USER_SQUARE, player)
   }
 
   const gameStore = {
-    activePlayers: [],
+    activePlayers: [] as CreatePlayerReturnType[],
     currentPlayer: createPlayer({
       parent: app,
       id: getId(),
       controls,
+      position: {
+        x: 340,
+        y: 340
+      },
       speed: 5,
       color: 'sky-400',
-      boostStyles: 'drop-shadow-[0_0_20px_rgba(0,100,200,0.75)]',
+      boostStyles: 'drop-shadow-[0_0_20px_rgba(56,189,248,1)]',
       emitMovement
     }),
-    updateActivePlayers(player) {
+    updateActivePlayers(player: PlayerType) {
       const index = this.activePlayers.findIndex((p) => p.id === player.id)
 
       if (index !== -1) {
@@ -238,7 +259,7 @@ import { $, debounce, handleDomElement } from '/utils.js'
       })
       this.activePlayers.push(newPlayer)
     },
-    disconnectPlayer(player) {
+    disconnectPlayer(player: PlayerType) {
       const index = this.activePlayers.findIndex((p) => p.id === player.id)
 
       if (index !== -1) {
@@ -251,23 +272,23 @@ import { $, debounce, handleDomElement } from '/utils.js'
   gameStore.activePlayers.push(gameStore.currentPlayer)
 
   const socketEvents = {
-    [SERVER_EVENTS.PLAYER_JOINED]: (user) => {
+    [SERVER_EVENTS.PLAYER_JOINED]: (user: PlayerType) => {
       gameStore.updateActivePlayers(user)
     },
-    [SERVER_EVENTS.PLAYER_DISCONNECTED]: (user) => {
+    [SERVER_EVENTS.PLAYER_DISCONNECTED]: (user: PlayerType) => {
       gameStore.disconnectPlayer(user)
     },
-    [SERVER_EVENTS.UPDATE_USER_SQUARE]: (user) => {
+    [SERVER_EVENTS.UPDATE_USER_SQUARE]: (user: PlayerType) => {
       gameStore.updateActivePlayers(user)
     },
-    [SERVER_EVENTS.UPDATE_ALL]: (users) => {
+    [SERVER_EVENTS.UPDATE_ALL]: (users: PlayerType[]) => {
       users.forEach((user) => {
         gameStore.updateActivePlayers(user)
       })
     }
   }
 
-  const registerSocketEvents = (socket) => {
+  const registerSocketEvents = (socket: any) => {
     for (const [event, handler] of Object.entries(socketEvents)) {
       socket.on(event, handler)
     }

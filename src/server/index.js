@@ -6,15 +6,18 @@ import {
   clickLimit,
   PLAYER_STATES,
   playerSchema,
-  SERVER_EVENTS,
-  SERVER_STATES
+  SERVER_EVENTS
 } from './consts.js'
 
-const port = process.env.PORT ?? 4321
+const port = process.env.PORT ?? 3000
 
 const app = express()
 const server = createServer(app)
-const io = new Server(server)
+const io = new Server(server, {
+  cors: {
+    origin: '*'
+  }
+})
 
 const connectedUsers = []
 
@@ -218,7 +221,11 @@ io.on('connection', (socket) => {
   })
 })
 
-app.use(express.static(path.join(process.cwd(), 'src/public')))
+app.use(express.static(path.join(process.cwd(), 'dist')))
+
+app.use((_, res) => {
+  res.sendFile(process.cwd() + '/dist/404.html')
+})
 
 server.listen(port, () => {
   console.log(`Server running on port http://localhost:${port}`)

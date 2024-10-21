@@ -1,0 +1,45 @@
+---
+import JavascriptIcon from './icons/JavascriptIcon.astro'
+---
+
+<header
+  class="flex flex-wrap justify-between items-center content-center relative
+    px-5 py-3 gap-6 w-dvw
+    bg-zinc-950"
+>
+  <div class="flex flex-wrap gap-y-1.5 gap-x-3">
+    <div class="contents">
+      <a class="mx-auto flex content-center" href="/">
+        <div class="content-center mr-1">
+          <JavascriptIcon class="w-5 h-5" />
+        </div>
+        <span class="text-xl font-semibold text-secondary-100">Games</span>
+      </a>
+    </div>
+    <nav>
+      <ul
+        class="flex flex-wrap items-center font-medium text-zinc-400
+          [&>li]:contents [&>li>a]:inline-block
+          [&>li>a]:text-sm [&>li>a]:px-2 [&>li>a]:py-1
+          [&>li>a:hover]:text-secondary-200 [&>li>a:focus]:text-secondary-200
+          [&>li>a]:transition-colors"
+      >
+        <li>
+          <a href="/">Clicker</a>
+        </li>
+        <li>
+          <a href="/square">Square</a>
+        </li>
+        <li>
+          <a href="/404">404</a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="contents">
+    <button data-id="exit-button"> Salir </button>
+  </div>
+</header>
+
+<div class="border-b border-zinc-800"></div>

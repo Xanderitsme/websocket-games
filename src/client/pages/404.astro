@@ -1,0 +1,140 @@
+---
+import MainLayout from '@/layouts/MainLayout.astro'
+---
+
+<MainLayout title="Page not found" hideFooter>
+  <div
+    class="flex justify-center items-center selection:bg-secondary-500/20 flex-grow"
+  >
+    <div class="text-secondary-100 max-w-4xl flex flex-col gap-8 p-4">
+      <div>
+        <h1
+          class="dynamic-rainbow font-bold text-center w-fit mx-auto text-7xl sm:text-8xl lg:text-9xl"
+          data-id="404-emoji"
+        >
+          (っ°Д°;)っ
+        </h1>
+      </div>
+
+      <!-- <div>
+        <p
+          class="dynamic-rainbow
+        text-center font-bold text-[4px] md:text-[6px]
+          w-fit mx-auto
+          cursor-pointer opacity-80 hover:opacity-90 active:opacity-100
+          transition"
+          title="Click to copy to the clipboard"
+          data-id="404-ascii-art"
+        >
+        </p>
+      </div> -->
+
+      <h2
+        class="font-semibold text-center text-balance text-3xl sm:text-4xl lg:text-5xl"
+      >
+        ¡Oh, no! Parece que te perdiste.
+      </h2>
+      <div class="text-center font-light text-balance">
+        Parece que estás buscando algo que no existe. ¿Quizás te equivocaste de
+        URL? O tal vez la página que buscas se ha trasladado o eliminado.
+      </div>
+
+      <div class="flex justify-center mt-4">
+        <a href="/" class="contents">
+          <button
+            class="px-6 py-4
+              font-bold text-lg
+              border border-secondary-100
+              hover:bg-slate-100 hover:text-zinc-900 transition duration-500"
+          >
+            Volver al inicio
+          </button>
+        </a>
+      </div>
+    </div>
+  </div>
+</MainLayout>
+
+<style>
+  @keyframes move-background {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .dynamic-rainbow {
+    background: linear-gradient(
+      -45deg,
+      hsl(300, 100%, 50%),
+      hsl(60, 50%, 50%),
+      hsl(160, 50%, 50%),
+      hsl(300, 50%, 50%),
+      hsl(60, 50%, 50%),
+      hsl(160, 50%, 50%),
+      hsl(300, 50%, 50%),
+      hsl(60, 50%, 50%),
+      hsl(160, 50%, 50%),
+      hsl(300, 100%, 50%)
+    );
+    background-size: 600% 600%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: move-background 30s linear infinite;
+
+    &::selection {
+      color: #e0f2fe;
+    }
+  }
+</style>
+
+<script>
+  // import { asciiArt } from '@/scripts/ascii'
+  ;(() => {
+    const getRandomElement = <T,>(array: T[]) => {
+      if (array.length === 0) {
+        throw new Error('Unexpected empty array')
+      }
+
+      return array[Math.floor(Math.random() * array.length)]
+    }
+
+    const emojis = [
+      '(っ°Д°;)っ',
+      '(；′⌒`)',
+      '~(>_<。)\\ ',
+      '(´。＿。｀)',
+      '(⊙_⊙)?'
+    ]
+
+    const $emoji = document.querySelector('[data-id="404-emoji"]')
+
+    if ($emoji instanceof HTMLElement) {
+      $emoji.innerText = getRandomElement(emojis)
+    }
+
+    // const $asciiArt = document.querySelector('[data-id="404-ascii-art"]')
+
+    // const copyToClipboard = async (text: string) => {
+    //   return navigator.clipboard.writeText(text).then(
+    //     () => true,
+    //     () => false
+    //   )
+    // }
+
+    // if ($asciiArt instanceof HTMLElement) {
+    //   $asciiArt.innerText = getRandomElement(asciiArt)
+
+    //   $asciiArt.addEventListener('click', () => {
+    //     const content = $asciiArt.getHTML().trim().replaceAll('<br>', '\n')
+    //     copyToClipboard(content)
+    //   })
+    // }
+  })()
+</script>
