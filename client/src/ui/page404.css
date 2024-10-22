@@ -1,0 +1,36 @@
+@keyframes move-background {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.dynamic-rainbow {
+  background: linear-gradient(-45deg,
+      hsl(300, 100%, 50%),
+      hsl(60, 50%, 50%),
+      hsl(160, 50%, 50%),
+      hsl(300, 50%, 50%),
+      hsl(60, 50%, 50%),
+      hsl(160, 50%, 50%),
+      hsl(300, 50%, 50%),
+      hsl(60, 50%, 50%),
+      hsl(160, 50%, 50%),
+      hsl(300, 100%, 50%));
+  background-size: 600% 600%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: move-background 30s linear infinite;
+
+  &::selection {
+    color: #e0f2fe;
+  }
+}
