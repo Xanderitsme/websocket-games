@@ -1,3 +1,4 @@
+import { envs } from '@/config/envs'
 import express from 'express'
 import { createServer } from 'node:http'
 import path from 'node:path'
@@ -9,7 +10,7 @@ import {
   SERVER_EVENTS
 } from './consts'
 
-const port = process.env.PORT ?? 3000
+const port = envs.SERVER_PORT ?? 3000
 
 const app = express()
 const server = createServer(app)

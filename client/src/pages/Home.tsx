@@ -2,7 +2,7 @@ import { Button } from '@/components/general/Button'
 import { Input } from '@/components/general/Input'
 import { MainLayout } from '@/layouts/MainLayout'
 
-export const Home = () => {
+export const HomePage = () => {
   return (
     <MainLayout title="Clicker Game">
       <main className="py-6 px-2 flex justify-center items-center">
