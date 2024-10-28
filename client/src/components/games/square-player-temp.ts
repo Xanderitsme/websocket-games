@@ -91,7 +91,7 @@ export const initGame = () => {
     }
 
     if (controls) {
-      let initialTime: number = 0
+      let initialTime = 0
 
       const moveSquare = () => {
         if (squareData.controls.boost) {

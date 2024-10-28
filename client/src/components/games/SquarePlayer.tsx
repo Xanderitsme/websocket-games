@@ -1,72 +1,28 @@
-import { ControlObject } from '@/types'
+import { ControlObject, Player } from '@/types'
 import { useEffect, useRef } from 'react'
 
-interface Position {
-  x: number
-  y: number
+interface Props extends Player {
+  width: number
+  height: number
 }
-
-interface Props {
-  boardWidth: number
-  boardHeight: number
-  squareSize: number
-  position: Position
-}
-
-// const initialPosition = { x: 340, y: 340 }
 
 export const SquarePlayer = ({
-  boardWidth,
-  boardHeight,
-  squareSize,
-  position
+  width,
+  height,
+  // boost,
+  controllable,
+  position,
+  color
 }: Props) => {
-  // const [position] = useState<Position>(initialPosition)
-
   const playerRef = useRef<HTMLDivElement>(null)
-  const boostStyles = 'drop-shadow-[0_0_20px_rgba(56,189,248,1)]'
 
   useEffect(() => {
-    if (playerRef.current === null) {
-      return
+    const $player = playerRef.current
+
+    if ($player !== null) {
+      $player.style.top = `${position.y}px`
+      $player.style.left = `${position.x}px`
     }
-
-    const boostStylesArray = boostStyles.split(' ')
-
-    const squareData = {
-      domElement: playerRef.current,
-      speed: 0,
-      posX: position.x,
-      posY: position.y,
-      speedXAxis: 0,
-      speedYAxis: 0,
-      controls: {
-        left: false,
-        right: false,
-        up: false,
-        down: false,
-        boost: false,
-        shoot: false
-      },
-      get currentPosition() {
-        return {
-          x: this.posX,
-          y: this.posY
-        }
-      },
-      setPosition({ x, y }: { x: number; y: number }) {
-        this.posX = x
-        this.posY = y
-
-        this.domElement.style.left = `${x}px`
-        this.domElement.style.top = `${y}px`
-      }
-    }
-
-    squareData.setPosition({
-      x: squareData.posX,
-      y: squareData.posY
-    })
 
     const controls: ControlObject = {
       j: 'left',
@@ -77,72 +33,86 @@ export const SquarePlayer = ({
       s: 'shoot'
     }
 
-    const speed = 5
+    const boostStyles = 'drop-shadow-[0_0_20px_rgba(56,189,248,1)]'
+    const boostStylesArray = boostStyles.split(' ')
 
-    let initialTime: number = 0
+    const squareData = {
+      baseSpeed: 5,
+      speed: 5,
+      controls: {
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+        boost: false,
+        shoot: false
+      }
+    }
 
-    const moveSquare = () => {
-      if (squareData.controls.boost) {
-        if (initialTime === 0) {
-          initialTime = new Date().getTime()
-        } else {
-          const currentTime = new Date().getTime()
+    let lastUpdateTime = 0
+    const updateInterval = 16.67
+    let accumulatedTime = 0
+    let boostStartTime = 0
 
-          const elapsedTime = currentTime - initialTime
+    const moveSquare = (timestamp: number) => {
+      if (!lastUpdateTime) lastUpdateTime = timestamp
+      const deltaTime = timestamp - lastUpdateTime
+      lastUpdateTime = timestamp
 
-          if (elapsedTime < 1000) {
-            squareData.speed = speed * 2
-            squareData.domElement.classList.add(...boostStylesArray)
-          } else {
-            squareData.speed = speed
-            squareData.domElement.classList.remove(...boostStylesArray)
-          }
-        }
-      } else {
-        squareData.speed = speed
-        initialTime = 0
-        squareData.domElement.classList.remove(...boostStylesArray)
+      accumulatedTime += deltaTime
+
+      if ($player === null) {
+        return
       }
 
-      squareData.speedXAxis =
+      if (squareData.controls.boost) {
+        if (boostStartTime === 0) {
+          boostStartTime = timestamp
+        }
+
+        const elapsedTime = timestamp - boostStartTime
+
+        if (elapsedTime < 1000) {
+          squareData.speed = squareData.baseSpeed * 2
+          $player.classList.add(...boostStylesArray)
+        } else {
+          squareData.speed = squareData.baseSpeed
+          $player.classList.remove(...boostStylesArray)
+        }
+      } else {
+        squareData.speed = squareData.baseSpeed
+        boostStartTime = 0
+        $player.classList.remove(...boostStylesArray)
+      }
+
+      const speedXAxis =
         (squareData.controls.right ? squareData.speed : 0) -
         (squareData.controls.left ? squareData.speed : 0)
-
-      squareData.speedYAxis =
+      const speedYAxis =
         (squareData.controls.down ? squareData.speed : 0) -
         (squareData.controls.up ? squareData.speed : 0)
 
-      const initialPosition = squareData.currentPosition
+      const currentPosition = {
+        x: Number($player.style.left.replace('px', '')),
+        y: Number($player.style.top.replace('px', ''))
+      }
 
-      squareData.posX = Math.max(
-        0,
-        Math.min(
-          boardWidth - squareSize,
-          squareData.posX + squareData.speedXAxis
-        )
-      )
-      squareData.posY = Math.max(
-        0,
-        Math.min(
-          boardHeight - squareSize,
-          squareData.posY + squareData.speedYAxis
-        )
-      )
+      while (accumulatedTime >= updateInterval) {
+        const newPosition = {
+          x: Math.max(0, Math.min(700 - width, currentPosition.x + speedXAxis)),
+          y: Math.max(0, Math.min(700 - height, currentPosition.y + speedYAxis))
+        }
 
-      squareData.domElement.style.left = squareData.posX + 'px'
-      squareData.domElement.style.top = squareData.posY + 'px'
+        if (
+          currentPosition.x !== newPosition.x ||
+          currentPosition.y !== newPosition.y
+        ) {
+          $player.style.left = `${newPosition.x}px`
+          $player.style.top = `${newPosition.y}px`
+          console.log(newPosition)
+        }
 
-      const finalPosition = squareData.currentPosition
-
-      if (
-        initialPosition.x !== finalPosition.x ||
-        initialPosition.y !== finalPosition.y
-      ) {
-        // if (emitMovement) {
-        console.log({
-          position: finalPosition
-        })
-        // }
+        accumulatedTime -= updateInterval
       }
 
       requestAnimationFrame(moveSquare)
@@ -160,28 +130,30 @@ export const SquarePlayer = ({
       }
     }
 
-    document.addEventListener('keydown', onKeyDown)
-    document.addEventListener('keyup', onKeyUp)
+    if (controllable) {
+      document.addEventListener('keydown', onKeyDown)
+      document.addEventListener('keyup', onKeyUp)
 
-    requestAnimationFrame(moveSquare)
+      requestAnimationFrame(moveSquare)
+    }
 
     return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.removeEventListener('keyup', onKeyUp)
+      if (controllable) {
+        document.removeEventListener('keydown', onKeyDown)
+        document.removeEventListener('keyup', onKeyUp)
+      }
     }
-  }, [boardWidth, boardHeight, squareSize, position])
-
-  useEffect(() => {
-    if (playerRef.current !== null) {
-      playerRef.current.style.top = `${position.y}px`
-      playerRef.current.style.left = `${position.x}px`
-    }
-  }, [position])
+  }, [position, controllable, height, width])
 
   return (
     <div
-      className="w-[20px] h-[20px] bg-sky-400 rounded absolute"
       ref={playerRef}
+      className="rounded absolute transition"
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+        backgroundColor: color
+      }}
     ></div>
   )
 }

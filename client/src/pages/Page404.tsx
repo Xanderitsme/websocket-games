@@ -1,22 +1,41 @@
 import { asciiIllustrations, emojis } from '@/consts'
-import { MainLayout } from '@/layouts/MainLayout'
 import '@/ui/page404.css'
-import { getRandomElement } from '@/utils'
-import { useEffect, useState } from 'react'
+import { copyToClipboard, getRandomElement } from '@/utils'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 export const Page404 = () => {
   const [emoji, setEmoji] = useState<string>('')
   const [asciiArt, setAsciiArt] = useState<string>('')
 
+  const asciiContainerRef = useRef<HTMLPreElement>(null)
+
   useEffect(() => {
     setEmoji(getRandomElement(emojis))
     setAsciiArt(getRandomElement(asciiIllustrations))
+
+    const $asciiContainer = asciiContainerRef.current
+
+    const onAsciiContainerClick = () => {
+      if (asciiContainerRef.current !== null) {
+        const content = asciiContainerRef.current
+          .getHTML()
+          .trim()
+          .replaceAll('<br>', '\n')
+        copyToClipboard(content)
+      }
+    }
+
+    $asciiContainer?.addEventListener('click', onAsciiContainerClick)
+
+    return () => {
+      $asciiContainer?.removeEventListener('click', onAsciiContainerClick)
+    }
   }, [])
 
   return (
-    <MainLayout title="Page not found" hideFooter={true}>
-      <main className="flex justify-center items-center selection:bg-secondary-500/20">
+    <>
+      <main className="h-full flex justify-center items-center selection:bg-secondary-500/20">
         <div className="text-secondary-100 max-w-4xl flex flex-col gap-8 p-4">
           <div>
             <h1 className="dynamic-rainbow font-bold text-center w-fit mx-auto text-7xl sm:text-8xl lg:text-9xl">
@@ -53,12 +72,13 @@ export const Page404 = () => {
                 cursor-pointer opacity-80 hover:opacity-90 active:opacity-100
                 transition"
               title="Click to copy to the clipboard"
+              ref={asciiContainerRef}
             >
               {asciiArt}
             </pre>
           </div>
         </div>
       </main>
-    </MainLayout>
+    </>
   )
 }

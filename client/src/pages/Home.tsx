@@ -1,10 +1,9 @@
 import { Button } from '@/components/general/Button'
 import { Input } from '@/components/general/Input'
-import { MainLayout } from '@/layouts/MainLayout'
 
 export const HomePage = () => {
   return (
-    <MainLayout title="Clicker Game">
+    <>
       <main className="py-6 px-2 flex justify-center items-center">
         <section
           className="bg-zinc-100 dark:bg-zinc-900 rounded-lg px-6 py-8 ring-1 ring-slate-900/5 shadow-xl h-fit"
@@ -48,9 +47,9 @@ export const HomePage = () => {
       <div
         data-id="temporal-message"
         className="font-semibold p-3 w-fit max-w-80
-      absolute bottom-4 right-4
-      bg-zinc-900 rounded-md transition opacity-0"
+        absolute bottom-4 right-4
+        bg-zinc-900 rounded-md transition opacity-0"
       ></div>
-    </MainLayout>
+    </>
   )
 }

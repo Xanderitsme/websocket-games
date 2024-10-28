@@ -41,3 +41,16 @@ interface ClickerPlayerType {
 type ClickerPlayerKeys = (typeof playerSchema)[keyof typeof playerSchema]
 
 type ClickerOnGameStateChangeType = (newState: PlayerStatus) => void
+
+interface Position {
+  x: number
+  y: number
+}
+
+interface Player {
+  id: string
+  boost: boolean
+  controllable: boolean
+  position: Position
+  color: string
+}
