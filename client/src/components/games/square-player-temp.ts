@@ -150,6 +150,8 @@ export const initGame = () => {
           initialPosition.x !== finalPosition.x ||
           initialPosition.y !== finalPosition.y
         ) {
+          // squareData.setPosition(finalPosition)
+
           if (emitMovement) {
             emitMovement({
               id: squareData.id,
