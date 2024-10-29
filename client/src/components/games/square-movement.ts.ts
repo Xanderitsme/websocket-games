@@ -1,10 +1,19 @@
-import { ControlObject, Player } from '@/types'
+import { ControlObject, Player, Position } from '@/types'
 
 interface initGameArgs extends Player {
   $player: HTMLDivElement
   width: number
   height: number
   controls: ControlObject
+  emitPosition?: (position: Position) => void
+  board: {
+    width: number
+    height: number
+  }
+}
+
+interface setPositionArgs {
+  position: Position
 }
 
 export const squareMovement = ({
@@ -13,7 +22,9 @@ export const squareMovement = ({
   height,
   controllable,
   position,
-  controls
+  controls,
+  emitPosition,
+  board
 }: initGameArgs) => {
   $player.style.top = `${position.y}px`
   $player.style.left = `${position.x}px`
@@ -31,6 +42,14 @@ export const squareMovement = ({
       down: false,
       boost: false,
       shoot: false
+    },
+    setPosition({ position }: setPositionArgs) {
+      $player.style.left = `${position.x}px`
+      $player.style.top = `${position.y}px`
+
+      if (emitPosition !== undefined) {
+        emitPosition(position)
+      }
     }
   }
 
@@ -80,17 +99,23 @@ export const squareMovement = ({
 
     while (accumulatedTime >= updateInterval) {
       const newPosition = {
-        x: Math.max(0, Math.min(700 - width, currentPosition.x + speedXAxis)),
-        y: Math.max(0, Math.min(700 - height, currentPosition.y + speedYAxis))
+        x: Math.max(
+          0,
+          Math.min(board.width - width, currentPosition.x + speedXAxis)
+        ),
+        y: Math.max(
+          0,
+          Math.min(board.height - height, currentPosition.y + speedYAxis)
+        )
       }
 
       if (
         currentPosition.x !== newPosition.x ||
         currentPosition.y !== newPosition.y
       ) {
-        $player.style.left = `${newPosition.x}px`
-        $player.style.top = `${newPosition.y}px`
-        console.log(newPosition)
+        // $player.style.left = `${newPosition.x}px`
+        // $player.style.top = `${newPosition.y}px`
+        squareData.setPosition({ position: newPosition })
       }
 
       accumulatedTime -= updateInterval
@@ -111,12 +136,24 @@ export const squareMovement = ({
     }
   }
 
-  if (controllable) {
-    document.addEventListener('keydown', onKeyDown)
-    document.addEventListener('keyup', onKeyUp)
+  const addEvents = () => {
+    if (controllable) {
+      document.addEventListener('keydown', onKeyDown)
+      document.addEventListener('keyup', onKeyUp)
+    }
+  }
 
+  const clearEvents = () => {
+    if (controllable) {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keyup', onKeyUp)
+    }
+  }
+
+  if (controllable) {
+    addEvents()
     requestAnimationFrame(moveSquare)
   }
 
-  return { onKeyUp, onKeyDown }
+  return { clearEvents }
 }

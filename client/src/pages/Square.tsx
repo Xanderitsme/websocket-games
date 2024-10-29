@@ -1,11 +1,12 @@
 import { SquarePlayer } from '@/components/games/SquarePlayer'
 import { Player } from '@/types'
 import { useEffect, useState } from 'react'
+import { io } from 'socket.io-client'
 
 const gameConfig = {
   board: {
-    width: 700,
-    height: 700
+    width: 800,
+    height: 600
   },
   player: {
     width: 20,
@@ -17,15 +18,41 @@ const gameConfig = {
   }
 }
 
+const playerSchema = {
+  id: 'id'
+}
+
+const getId = () => {
+  const savedId = window.localStorage.getItem(playerSchema.id)
+
+  if (savedId) {
+    return savedId
+  }
+
+  const newId = crypto.randomUUID()
+  window.localStorage.setItem(playerSchema.id, newId)
+
+  return newId
+}
+
 export const SquarePage = () => {
   const [players, setPlayers] = useState<Player[]>([])
 
   useEffect(() => {
+    const socket = io('http://localhost:3000/', {
+      reconnectionDelayMax: 10000,
+      auth: {
+        id: getId(),
+        position: gameConfig.player.initialPosition
+      }
+    })
+
     const newPlayer = {
       id: crypto.randomUUID(),
       boost: false,
       controllable: true,
       color: '#38bdf8',
+      socket,
       position: {
         x: gameConfig.player.initialPosition.x,
         y: gameConfig.player.initialPosition.y
@@ -78,6 +105,8 @@ export const SquarePage = () => {
                 position={player.position}
                 width={gameConfig.player.width}
                 height={gameConfig.player.height}
+                board={gameConfig.board}
+                socket={player.socket}
               />
             ))}
           </div>

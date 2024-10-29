@@ -1,10 +1,15 @@
-import { ControlObject, Player } from '@/types'
+import { ControlObject, Player, Position } from '@/types'
 import { useEffect, useRef } from 'react'
 import { squareMovement } from './square-movement.ts'
+import { SERVER_EVENTS } from '@/consts/consts.ts'
 
 interface Props extends Player {
   width: number
   height: number
+  board: {
+    width: number
+    height: number
+  }
 }
 
 export const SquarePlayer = ({
@@ -13,7 +18,9 @@ export const SquarePlayer = ({
   boost,
   controllable,
   position,
-  color
+  color,
+  socket,
+  board
 }: Props) => {
   const playerRef = useRef<HTMLDivElement>(null)
 
@@ -33,7 +40,18 @@ export const SquarePlayer = ({
       s: 'shoot'
     }
 
-    const { onKeyDown, onKeyUp } = squareMovement({
+    const emitPosition = (position: Position) => {
+      if (socket) {
+        socket.emit(SERVER_EVENTS.UPDATE_USER_SQUARE, {
+          id: '1',
+          position
+        })
+
+        console.log(position)
+      }
+    }
+
+    const { clearEvents } = squareMovement({
       id: '1',
       $player,
       boost,
@@ -42,14 +60,15 @@ export const SquarePlayer = ({
       width,
       height,
       position,
-      controls
+      controls,
+      emitPosition,
+      board
     })
 
     return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.removeEventListener('keyup', onKeyUp)
+      clearEvents()
     }
-  }, [color, controllable, height, position, width, boost])
+  }, [color, controllable, height, position, width, boost, board, socket])
 
   return (
     <div

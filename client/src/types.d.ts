@@ -1,3 +1,4 @@
+import { Socket } from 'socket.io-client'
 import { controlValues, PLAYER_STATES, playerSchema } from './consts'
 
 interface PlayerType {
@@ -53,4 +54,5 @@ interface Player {
   controllable: boolean
   position: Position
   color: string
+  socket?: Socket
 }
